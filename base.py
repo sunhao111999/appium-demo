@@ -7,6 +7,7 @@ import os
 from time import sleep, time
 
 from appium import webdriver
+from PIL import Image, ImageDraw
 
 PATH = lambda p: os.path.abspath(os.path.join(os.path.dirname(__file__), p))
 MAX_TIME = 8
@@ -41,7 +42,7 @@ class DoubanTest(unittest.TestCase):
         desired_caps = {'platformName': 'Android',
                         'platformVersion': '4.4',
                         'deviceName': 'Android Emulator',
-                        'app': PATH('apps/' + 'app-beta.apk'),
+                        'app': PATH('apps/' + 'app-debug.apk'),
                         'appPackage': self.APP_PACKAGE,
                         'appActivity': '.activity.SplashActivity'}
 
@@ -53,21 +54,21 @@ class DoubanTest(unittest.TestCase):
         os.popen('adb shell am force-stop %s' % self.APP_PACKAGE)
         os.popen('adb logcat -d | grep E/AndroidRuntime >> logcat_error.log')
 
-    def _find_by(self, att, value, wait_time=5):
+    def _find_by(self, find_type, element, element_xy=0, wait_time=5):
         ui_object = ''
 
         wait = 1
 
         while wait < wait_time:
             try:
-                if att == self.by_name:
-                    ui_object = self.driver.find_element_by_name(value)
-                elif att == self.by_id:
-                    ui_object = self.driver.find_element_by_id(value)
-                elif att == self.by_auia:
-                    ui_object = self.driver.find_element_by_android_uiautomator(value)
+                if find_type == self.by_name:
+                    ui_object = self.driver.find_element_by_name(element)
+                elif find_type == self.by_id:
+                    ui_object = self.driver.find_element_by_id(element)
+                elif find_type == self.by_auia:
+                    ui_object = self.driver.find_element_by_android_uiautomator(element)
             except Exception:
-                print 'Wait to find %s again! Find count %s' % (value, wait)
+                print 'Wait to find %s again! Find count %s' % (element, wait)
                 sleep(1)
                 wait += 1
             else:
@@ -75,27 +76,38 @@ class DoubanTest(unittest.TestCase):
 
         if wait >= wait_time:
             print 'cant find this element, will take screenshot'
-            self.driver.get_screenshot_as_file(self._testMethodName + '.png')
+            screenshot_name = self._testMethodName + '.png'
+            self.driver.get_screenshot_as_file(screenshot_name)
+
+            # 提供某个元素的坐标，会在截图上标注出该元素
+            if element_xy != 0:
+                self._draw_ellipse(screenshot_name, element_xy)
 
         return ui_object
 
-    def _scroll_find_element(self, area, att, value):
+    def _scroll_find_element(self, swipe_xy, find_type, element):
         for i in xrange(MAX_TIME):
-            if self._find_by(att, value, 0):
+            if self._find_by(find_type, element, 0):
                 break
             else:
-                self._swipe_activity(area, 1)
+                self._swipe_activity(swipe_xy, 1)
 
-    def _swipe_activity(self, area, times):
+    def _swipe_activity(self, swipe_xy, times):
         for i in xrange(times):
             try:
-                self.driver.swipe(area[0], area[1], area[2], area[3], 600)
+                self.driver.swipe(swipe_xy[0], swipe_xy[1], swipe_xy[2], swipe_xy[3], 600)
                 sleep(1)
             except Exception, e:
                 print e
 
     def _get_activity_name(self):
         return str(self.driver.current_activity).split('.')[-1]
+
+    def _draw_ellipse(self, file_name, xy):
+        im = Image.open(file_name)
+        draw = ImageDraw.Draw(im)
+        draw.ellipse(xy, outline=(255, 0, 0, 255))
+        im.save(file_name)
 
 
 if __name__ == "__main__":
